@@ -1,0 +1,16 @@
+apiVersion: 1
+
+datasources:
+  - name: connection-to-aggregatorpg
+    type: postgres
+    uid: efu0bzagddssgd
+    url: postgres:5432
+    user: ${POSTGRES_USER}
+    isDefault: true
+    editable: false
+    jsonData:
+      database: ${POSTGRES_DB}
+      sslmode: disable
+      postgresVersion: 1700
+    secureJsonData:
+      password: ${POSTGRES_PASSWORD}

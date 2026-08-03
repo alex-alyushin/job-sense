@@ -1,11 +1,7 @@
 include .env
 export
 
-# run:
-# 	uv run python main.py
-
-# brightdata_test_api:
-# 	uv run python junk/brightdata_test_api.py
+# DOCKER
 
 network:
 	docker network inspect aggregator-net >/dev/null 2>&1 || \
@@ -23,7 +19,7 @@ postgres: network
 			-e POSTGRES_PASSWORD=$(POSTGRES_PASSWORD) \
 			-p 5432:5432 \
 			-v aggregator_data:/var/lib/postgresql/data \
-			postgres:17; \
+			pgvector/pgvector:pg17; \
 	fi
 
 dashboard: network
@@ -38,20 +34,38 @@ dashboard: network
 			grafana/grafana; \
 	fi
 
+
+# SERVICES
+
 telegram:
-	uv run python -m gateways.telegram_gateway
+	uv run python -m gateways.telegram
 
 llm:
-	uv run python -m services.llm_service
+	uv run python -m llm_service.main
 
-echo:
-	uv run python -m services.echo_service
+search:
+	uv run python -m search_service.main
 
-# search:
-# 	uv run python -m services.search_service
+report:
+	uv run python -m report_service.main
 
 up: postgres dashboard
 	@trap 'kill 0' INT TERM EXIT; \
-	uv run python -m gateways.telegram_gateway 2>&1 | sed -u 's/^/[telegram] /' & \
-	uv run python -m services.llm_service 2>&1 | sed -u 's/^/[llm] /' & \
+	uv run python -m gateways.telegram   2>&1 | sed $$'s/^/\033[34m/; s/$$/\033[0m/' & \
+	uv run python -m llm_service.main    2>&1 | sed $$'s/^/\033[35m/; s/$$/\033[0m/' & \
+	uv run python -m search_service.main 2>&1 | sed $$'s/^/\033[36m/; s/$$/\033[0m/' & \
+	uv run python -m report_service.main 2>&1 | sed $$'s/^/\033[32m/; s/$$/\033[0m/' & \
 	wait
+
+
+# DATABASE
+
+db_drop:
+	uv run python -m database.db_drop
+
+db_init:
+	uv run python -m database.db_init
+
+db: postgres \
+	db_drop \
+	db_init

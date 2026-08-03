@@ -1,0 +1,44 @@
+services:
+
+  postgres:
+    image: pgvector/pgvector:pg17
+    container_name: aggregator-pg-prod
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - aggregator_data_prod:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana
+    container_name: aggregator-dashboard-prod
+    ports:
+      - "3030:3000"
+    volumes:
+      - ./docker/grafana/provisioning:/etc/grafana/provisioning:ro
+    env_file:
+      - .env
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD}
+    depends_on:
+      - postgres
+    restart: unless-stopped
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: aggregator-app-prod
+    env_file:
+      - .env
+    environment:
+      POSTGRES_HOST: postgres
+    depends_on:
+      - postgres
+    restart: unless-stopped
+
+
+volumes:
+  aggregator_data_prod:

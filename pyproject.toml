@@ -6,9 +6,11 @@ readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
     "aiogram>=3.29.1",
+    "httpx>=0.28.1",
     "openai>=2.45.0",
     "psycopg[binary]>=3.3.4",
     "pymupdf>=1.28.0",
     "python-dotenv>=1.2.2",
     "requests>=2.34.2",
+    "supervisor>=4.3.0",
 ]
