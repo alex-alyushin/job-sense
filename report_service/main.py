@@ -43,8 +43,7 @@ class ReportService:
 
         for document in documents:
             await self.messages_store.store(
-                # todo: really it is not user
-                role="user",
+                role="report",
                 gateway=message.gateway,
                 direction="outgoing",
                 text_content=self._parse_caption(document.document),
