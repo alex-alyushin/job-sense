@@ -1,15 +1,16 @@
 import os
-import json
 import asyncio
 import logging
 
 from aiogram import Bot, Dispatcher
-from aiogram.types import Message as TGMessage, BufferedInputFile
-from aiogram.exceptions import TelegramBadRequest, TelegramAPIError
+from aiogram.types import Message as TGMessage, BufferedInputFile, LinkPreviewOptions
+from aiogram.exceptions import TelegramAPIError
 from aiogram.filters import Command
 
-from store.messages_store import MessagesStore, AsyncCursor
-from store.message_entity import MessageEntity
+from psycopg import AsyncCursor
+
+from store.messages_store import MessagesStore
+from store.entities.message_entity import MessageEntity
 
 from utils.utils import read_file, truncate
 from utils.log import configure_logging
@@ -43,7 +44,7 @@ class TelegramGateway:
             task_group.create_task(
                 self.messages_store.listen(
                     gateway="telegram",
-                    direction="outgoing",
+                    direction="user",
                     listener=self.send_message
                 )
             )
@@ -53,38 +54,19 @@ class TelegramGateway:
         chat_id = message.chat.id
 
         text_content = message.text or message.caption
-        file_content = await self._extract_file(message)
+        file_content, file_name = await self._extract_file(message)
 
         await self.messages_store.store(
             role="user",
             gateway="telegram",
-            direction="incoming",
+            direction="assistant",
             text_content=text_content,
             file_content=file_content,
-            file_name=None, # todo: store
+            file_name=file_name,
             external_chat_id=str(message.chat.id),
             external_user_id=str(message.from_user.id),
             external_user_name=str(message.from_user.username),
             external_message_id=str(message.message_id)
-        )
-
-
-    async def _extract_file(self, message: TGMessage):
-        document = message.document
-
-        if document is None:
-            return None
-
-        file_name = document.file_name
-        mime_type = document.mime_type
-
-        file_object = await self.bot.get_file(document.file_id)
-        file_stream = await self.bot.download(file_object)
-
-        return await read_file(
-            file_stream=file_stream,
-            mime_type=mime_type,
-            file_name=file_name,
         )
 
 
@@ -121,7 +103,7 @@ class TelegramGateway:
 
         finally:
             if delivered_message is not None:
-                await self.messages_store.sync_store_with_gateway(
+                await self.messages_store.update_externals(
                     cursor,
                     message_id=message.id,
                     external_chat_id=str(delivered_message.chat.id),
@@ -132,7 +114,8 @@ class TelegramGateway:
 
 
     async def _send_outgoing_message(
-        self, chat_id: str,
+        self, *,
+        chat_id: str,
         text_content=None,
         file_content=None,
         file_name=None,
@@ -163,17 +146,37 @@ class TelegramGateway:
             return await self.bot.send_message(
                 chat_id=chat_id,
                 parse_mode=parse_mode,
+                link_preview_options=LinkPreviewOptions(is_disabled=True),
                 text=text,
             )
 
         return None
 
 
-    # todo: debug
     async def resolve_session(self, message: TGMessage) -> None:
         await self.messages_store.resolve_session(
             external_chat_id=str(message.chat.id)
         )
+
+    async def _extract_file(self, message: TGMessage):
+        document = message.document
+
+        if document is None:
+            return None, None
+
+        file_name = document.file_name
+        mime_type = document.mime_type
+
+        file_object = await self.bot.get_file(document.file_id)
+        file_stream = await self.bot.download(file_object)
+
+        file_content = await read_file(
+            file_stream=file_stream,
+            mime_type=mime_type,
+            file_name=file_name,
+        )
+
+        return file_content, file_name
 
 
 async def main() -> None:
@@ -181,7 +184,7 @@ async def main() -> None:
     from dotenv import load_dotenv
     load_dotenv()
 
-    configure_logging(service_name="Telegram")
+    configure_logging(service_name="TelegramGate")
 
     telegram_token = os.getenv("TELEGRAM_TOKEN")
 

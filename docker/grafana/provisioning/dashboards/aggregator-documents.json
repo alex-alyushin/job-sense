@@ -70,7 +70,7 @@
                         "editorMode": "code",
                         "format": "table",
                         "rawQuery": true,
-                        "rawSql": "  SELECT\n    -- id,\n    -- source,\n    -- provider,\n    document,\n    -- embedding,\n    search_initiator,\n    created_at\n  FROM documents \n  WHERE created_at BETWEEN $__timeFrom() AND $__timeTo()\n  ORDER BY id DESC",
+                        "rawSql": "  SELECT\n    -- id,\n    -- source,\n    -- provider,\n    document,\n    -- embedding,\n    call_id,\n    created_at\n  FROM documents \n  WHERE created_at BETWEEN $__timeFrom() AND $__timeTo()\n  ORDER BY id DESC",
                         "sql": {
                           "columns": [
                             {
@@ -110,7 +110,7 @@
                 "sortBy": [
                   {
                     "desc": true,
-                    "displayName": "search_initiator"
+                    "displayName": "call_id"
                   }
                 ]
               },
@@ -197,7 +197,7 @@
                     "matcher": {
                       "id": "byName",
                       "scope": "series",
-                      "options": "search_initiator"
+                      "options": "call_id"
                     },
                     "properties": [
                       {

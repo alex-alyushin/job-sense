@@ -1,7 +1,7 @@
 import os
 
 from database.database_connect import database_connect, with_transaction
-from database.database_queries import init_vector, init_messages, init_documents
+from database.database_queries import init_vector, init_messages, init_users, init_user_cvs, init_documents
 
 
 if __name__ == "__main__":
@@ -20,6 +20,8 @@ if __name__ == "__main__":
     with with_transaction(conn=conn) as cursor:
         init_vector(cursor)
         init_messages(cursor)
+        init_users(cursor)
+        init_user_cvs(cursor)
         init_documents(cursor)
 
     print("DB inited")

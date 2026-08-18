@@ -1,7 +1,7 @@
 import os
 
 from database.database_connect import database_connect, with_transaction
-from database.database_queries import drop_messages, drop_documents
+from database.database_queries import drop_documents, drop_user_cvs, drop_users, drop_messages
 
 
 if __name__ == "__main__":
@@ -19,6 +19,8 @@ if __name__ == "__main__":
 
     with with_transaction(conn=conn) as cursor:
         drop_documents(cursor)
+        drop_user_cvs(cursor)
+        drop_users(cursor)
         drop_messages(cursor)
 
     print("DB dropped")

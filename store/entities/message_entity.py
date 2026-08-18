@@ -17,6 +17,7 @@ class MessageEntity:
     external_user_name: str | None
     external_message_id: str | None
 
+    llm_response: dict | None
     attributes: dict | None
 
     created_at: datetime
@@ -37,8 +38,9 @@ def row_to_message(row):
         external_user_id=row[8],
         external_user_name=row[9],
         external_message_id=row[10],
-        attributes=row[11],
-        created_at=row[12],
-        processed_at=row[13],
-        resolved_at=row[14]
+        llm_response=row[11],
+        attributes=row[12],
+        created_at=row[13],
+        processed_at=row[14],
+        resolved_at=row[15]
     )

@@ -5,6 +5,7 @@ import psycopg
 from datetime import datetime
 from contextlib import contextmanager
 
+from pgvector.psycopg import register_vector_async
 
 @contextmanager
 def with_transaction(conn):
@@ -43,6 +44,8 @@ async def database_connect_async(*, host, port, dbname, user, password):
         user=user,
         password=password
     )
+
+    await register_vector_async(conn)
 
     _log_connection_status(conn)
 

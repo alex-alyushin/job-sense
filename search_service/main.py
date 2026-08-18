@@ -1,21 +1,27 @@
 import os
 import json
-import httpx
+import time
 import asyncio
-import requests
 import logging
 
-from datetime import datetime
-from urllib.parse import urlencode
+from psycopg import AsyncCursor
 
-from pydantic import ValidationError
-from search_service.schema_brightdata_linkedin import LinkedInJobsInput
+from pydantic import BaseModel
 
-from store.messages_store import MessagesStore, AsyncCursor
-from store.message_entity import MessageEntity
+from store.entities.message_entity import MessageEntity
+from store.entities.user_entity import UserEntity
+from store.messages_store import MessagesStore
+
+from search_service.brightdata_api_schema.linkedin_jobs_input import LinkedInJobsInput
+from search_service.brightdata_api.brightdata_discover_linkedin_jobs import brightdata_discover_linkedin_jobs
+from search_service.brightdata_api.validate_linkedin_jobs_input import validate_brightdata_linkedin_jobs_input
+
+from embedding.embedder import Embedder
 
 from utils.log import configure_logging
 from utils.utils import truncate
+
+from pathlib import Path
 
 
 class SearchService:
@@ -24,12 +30,13 @@ class SearchService:
         self.logger = logging.getLogger("search_service")
         self.brigth_data_token = brigth_data_token
         self.messages_store = messages_store
+        self.embedder = Embedder()
 
 
     async def run(self):
         await self.messages_store.listen(
             gateway="telegram",
-            direction="internal",
+            direction="searcher",
             listener=self.search
         )
 
@@ -40,129 +47,98 @@ class SearchService:
 
     async def search(self, cursor: AsyncCursor, message: MessageEntity):
 
-        search_initiator = message.id
+        call_id = message.llm_response["call_id"]
+        search_input = message.llm_response["arguments"]
 
-        await self.messages_store.store(
-            role="searcher",
-            gateway=message.gateway,
-            direction="outgoing",
-            text_content="🔎 Searching...",
-            external_chat_id=message.external_chat_id,
-        )
+        # 1. Ensure user
 
-        request = self._validate_brightdata_input(message.text_content)
+        user: UserEntity = await self.messages_store.ensure_user(cursor, message=message)
 
-        if request is None:
-            # todo: notify user
+        if user is None:
+            self.logger.error("[ERROR] User not found")
+            await self._NOTIFY_REPORT(call_id=call_id, user=user)
             return
 
-        response = await self._brightdata_api(
-            request=request
+        # 2. Validate search params
+
+        request = validate_brightdata_linkedin_jobs_input(search_input)
+
+        if request is None:
+            await self._NOTIFY_USER(text="🚧 <b>Invalid request</b>", user=user)
+            await self._NOTIFY_REPORT(call_id=call_id, user=user)
+            return
+
+        # 3. BrightData API call
+
+        await self._NOTIFY_USER(
+            text=f"🔎 <b>Searching...</b>\n\n{self._format_search_params(request)}",
+            user=user,
+        )
+
+        response = await brightdata_discover_linkedin_jobs(
+            brigth_data_token=self.brigth_data_token,
+            request=request,
+            user=user,
+            notify_user=lambda text: self._NOTIFY_USER(text=text, user=user),
         )
 
         if response is None:
-            # todo: notify user
+            await self._NOTIFY_USER(text="🪫 <b>No results</b>", user=user)
+            await self._NOTIFY_REPORT(call_id=call_id, user=user)
             return
 
-        records = response.text.splitlines()
+        # 4. Parse documents
 
-        self.logger.info("Found %s records", len(records))
+        documents: list[dict] = []
+        records: list[str] = response.text.splitlines()
 
         for record in records:
-            document = self._parse_document(record)
-
+            document = self._parse_document(record=record)
             if document is not None:
-                await self.messages_store.store_document(
-                    cursor,
-                    search_initiator=search_initiator,
-                    document=document
-                )
+                documents.append(document)
 
-        await self.messages_store.store(
-            role="searcher",
-            gateway=message.gateway,
-            direction="report",
-            text_content=search_initiator,
-            external_chat_id=message.external_chat_id,
+        self.logger.info("Found %s records", len(records))
+        self.logger.info("Parsed %s documents", len(documents))
+
+        if not documents:
+            await self._NOTIFY_USER(text="🪫 <b>No results</b>", user=user)
+            await self._NOTIFY_REPORT(call_id=call_id, user=user)
+            return
+
+        # 5. Calculate embeddings and store documents
+
+        # todo: self.document_to_vector(...)
+
+        embeddings = self.embedder.encode_batch(
+            texts=[
+                self._extract_relevant_fields(
+                    document=document,
+                    relevant_fields=[
+                        "job_title",
+                        "job_summary",
+                        "job_description_formatted"
+                    ]
+                ) for document in documents
+            ]
         )
 
-
-    def _validate_brightdata_input(self, text_content: str):
-        try:
-            return LinkedInJobsInput.model_validate_json(text_content)
-
-        except ValidationError as validation_error:
-            self.logger.error(validation_error)
-            return None
-
-
-    async def _brightdata_api(self, request: LinkedInJobsInput):
-        try:
-
-            BASE_URL = "https://api.brightdata.com/datasets/v3/scrape"
-
-            QUERY_PARAMETERS = {
-                "dataset_id": "gd_lpfll7v5hcqtkxl6l",
-                "notify": "false",
-                "include_errors": "true",
-                "type": "discover_new",
-                "discover_by": "keyword",
-            }
-
-            url = f"{BASE_URL}?{urlencode(QUERY_PARAMETERS)}"
-
-            payload = {
-                "input": [request.model_dump(exclude_none=True)],
-                "limit_per_input": 12,
-            }
-
-            headers = {
-                "Authorization": f"Bearer {self.brigth_data_token}",
-                "Content-Type": "application/json",
-            }
-
-            self.logger.info(
-                "POST %s Payload: %s",
-                truncate(url, max_length=30, flat=True),
-                payload
+        for document, embedding in zip(documents, embeddings):
+            await self.messages_store.store_document(
+                cursor,
+                document=document,
+                embedding=embedding,
+                call_id=call_id,
+                user_id=user.id,
             )
 
-            async with httpx.AsyncClient() as async_client:
-                response = await async_client.post(
-                    url,
-                    json=payload,
-                    headers=headers,
-                    timeout=180
-                )
+        # 6. Notify report service
 
-            response.raise_for_status()
-
-        except httpx.TimeoutException as timeout_error:
-            self.logger.error(timeout_error)
-            return None
-
-        except httpx.ConnectError as connection_error:
-            self.logger.error(connection_error)
-            return None
-
-        except httpx.HTTPError as http_error:
-            self.logger.error(http_error)
-            return None
-
-        self.logger.info(
-            "%s %-30s %s %s",
-            response.request.method,
-            response.url.path[:30],
-            response.status_code,
-            response.reason_phrase
-        )
-
-        return response
+        return await self._NOTIFY_REPORT(call_id=call_id, user=user)
 
 
-    def _parse_document(self, document_str: str):
+    def _parse_document(self, record: str) -> dict:
         try:
-            document = json.loads(document_str)
+            document = json.loads(record)
 
             if document.get("url") is None:
                 return None
@@ -171,6 +147,73 @@ class SearchService:
 
         except json.JSONDecodeError:
             return None
+
+
+    def _extract_relevant_fields(
+        self,
+        document: dict,
+        relevant_fields: list[str],
+    ) -> str:
+        values = []
+
+        for field in relevant_fields:
+            values.append(document.get(field) or "")
+
+        return "\n\n".join(values)
+
+
+    async def _NOTIFY_USER(
+        self, *,
+        text: str,
+        user: UserEntity,
+    ):
+        return await self.messages_store.store(
+            role="searcher",
+            gateway=user.gateway,
+            direction="user",
+            text_content=truncate(text, max_length=1024),
+            external_chat_id=user.external_chat_id,
+            external_user_id=user.external_user_id,
+            external_user_name=user.external_user_name,
+        )
+
+
+    async def _NOTIFY_REPORT(self, call_id: str, user: UserEntity):
+        await self.messages_store.store(
+            role="searcher",
+            gateway=user.gateway,
+            direction="report",
+            # hack for report
+            text_content=call_id,
+            external_chat_id=user.external_chat_id,
+            external_user_id=user.external_user_id,
+            external_user_name=user.external_user_name,
+        )
+
+
+    def _format_search_params(self, request_model: BaseModel) -> str:
+        lines = []
+
+        for key, value in request_model.model_dump(exclude_none=True).items():
+            if value in (None, "", []):
+                continue
+
+            lines.append(f"<b>{key}:</b> {json.dumps(value, ensure_ascii=False)}")
+
+        return "\n".join(lines)
+
+
+    # debug
+    def _dump_to_file(self, data: str, user: UserEntity):
+        timestamp = int(time.time() * 1000)
+        debug_path = Path(f"tmp/brightdata_response_{user.id}_{timestamp}.json")
+        debug_path.parent.mkdir(parents=True, exist_ok=True)
+        debug_path.write_text(data, encoding="utf-8")
+
+        self.logger.info(
+            "Bright Data response saved to %s",
+            debug_path,
+        )
 
 
 async def main() -> None:

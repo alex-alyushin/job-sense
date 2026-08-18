@@ -1,3 +1,5 @@
+<img src="./assets/logo-v3.png" width="72" height="72">
+
 ## Job Sense
 
 Analyzes your CV and finds the most relevant job opportunities for you.

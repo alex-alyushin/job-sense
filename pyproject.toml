@@ -7,10 +7,15 @@ requires-python = ">=3.14"
 dependencies = [
     "aiogram>=3.29.1",
     "httpx>=0.28.1",
+    "huggingface-hub>=1.27.0",
+    "numpy>=2.5.2",
+    "onnxruntime>=1.29.0",
     "openai>=2.45.0",
+    "pgvector>=0.5.0",
     "psycopg[binary]>=3.3.4",
     "pymupdf>=1.28.0",
     "python-dotenv>=1.2.2",
     "requests>=2.34.2",
     "supervisor>=4.3.0",
+    "tokenizers>=0.23.1",
 ]

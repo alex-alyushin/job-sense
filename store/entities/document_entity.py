@@ -1,5 +1,5 @@
 from datetime import datetime
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 @dataclass
 class DocumentEntity:
@@ -8,7 +8,8 @@ class DocumentEntity:
     provider: str | None
     document: dict | None
     embedding: list[float] | None
-    search_initiator: int
+    call_id: str
+    user_id: int
     created_at: datetime
 
 
@@ -19,6 +20,7 @@ def row_to_document(row):
         provider=row[2],
         document=row[3],
         embedding=row[4],
-        search_initiator=row[5],
-        created_at=row[6],
+        call_id=row[5],
+        user_id=row[6],
+        created_at=row[7],
     )

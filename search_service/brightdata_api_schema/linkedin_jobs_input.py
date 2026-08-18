@@ -46,8 +46,8 @@ class LinkedInJobsInput(BaseModel):
 
     keyword: str | None = Field(
         description=(
-            "Collect new jobs by keyword search like the job title,"
-            "for example: Product Manager. Utilize quotation marks"
+            "Collect new jobs by keyword search like the job title, "
+            "for example: Product Manager. Utilize quotation marks "
             "around specific words or phrases to ensure an exact match."
         ),
         default=None
@@ -93,7 +93,15 @@ class LinkedInJobsInput(BaseModel):
         default=[]
     )
 
-    location_radius: str | None = Field(default=None)
+    location_radius: str | None = Field(
+        description=(
+            "Optional radius around `location` to broaden the search. "
+            "Bright Data does not document the exact format or units for "
+            "this field, so leave it unset unless the user explicitly asks "
+            "for a wider or narrower search area."
+        ),
+        default=None
+    )
 
 
 schema_brightdata_linkedin = LinkedInJobsInput.model_json_schema()
