@@ -326,3 +326,17 @@ class MessagesStore:
         rows = await cursor.fetchall()
 
         return [row_to_document(row) for row in rows]
+
+    async def update_document_embedding(
+        self,
+        cursor,
+        *,
+        document,
+        embedding
+    ):
+
+        await cursor.execute("""
+            UPDATE documents
+            SET embedding = %s
+            WHERE id = %s
+        """, (embedding, document.id))

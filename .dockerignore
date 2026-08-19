@@ -1,7 +1,11 @@
-.venv
 .git
+
+.venv
+.env
+
+.drafts
+
 __pycache__
 *.pyc
-.env
-.env.example
-.xdrafts
+
+embedding/models/*

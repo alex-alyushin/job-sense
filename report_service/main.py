@@ -10,6 +10,8 @@ from store.document_entity import DocumentEntity
 
 from store.messages_store import MessagesStore, AsyncCursor
 
+from embedding.embedder import Embedder
+
 from utils.log import configure_logging
 
 
@@ -18,6 +20,7 @@ class ReportService:
     def __init__(self, messages_store: MessagesStore):
         self.logger = logging.getLogger("report_service")
         self.messages_store = messages_store
+        self.embedder = Embedder()
 
 
     async def run(self):
@@ -41,6 +44,24 @@ class ReportService:
             search_initiator=search_initiator,
         )
 
+        if not documents:
+            return
+
+        embeddings = self.embedder.encode_batch(
+            texts=[
+                self._parse_document_text(document.document)
+                for document in documents
+            ]
+        )
+
+        for document, embedding in zip(documents, embeddings):
+            await self.messages_store.update_document_embedding(
+                cursor,
+                document=document,
+                embedding=embedding,
+            )
+
+        # tmp
         for document in documents:
             await self.messages_store.store(
                 role="report",
@@ -51,6 +72,20 @@ class ReportService:
                 file_name=self._parse_filename(document.document),
                 external_chat_id=message.external_chat_id
             )
+
+
+    def _parse_document_text(self, document: dict) -> str:
+        job_description_formatted = document.get("job_description_formatted")
+        job_summary = document.get("job_summary")
+        job_title = document.get("job_title")
+
+        return f"""
+        {job_title}
+
+        {job_summary}
+
+        {job_description_formatted}
+        """
 
 
     def _parse_filename(self, document: dict) -> str:

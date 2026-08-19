@@ -1,6 +1,9 @@
 .venv
 .env
 
-.xdrafts/
+.drafts
 
-__pycache__/
+__pycache__
+*.pyc
+
+embedding/models/*
