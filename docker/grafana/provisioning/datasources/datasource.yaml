@@ -4,7 +4,7 @@ datasources:
   - name: connection-to-aggregatorpg
     type: postgres
     uid: efu0bzagddssgd
-    url: postgres:5432
+    url: ${GRAFANA_POSTGRES_HOST}:5432
     user: ${POSTGRES_USER}
     isDefault: true
     editable: false

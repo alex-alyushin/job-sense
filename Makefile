@@ -17,7 +17,7 @@ postgres: network
 			-e POSTGRES_DB=$(POSTGRES_DB) \
 			-e POSTGRES_USER=$(POSTGRES_USER) \
 			-e POSTGRES_PASSWORD=$(POSTGRES_PASSWORD) \
-			-p 5432:5432 \
+			-p $(POSTGRES_PORT):5432 \
 			-v aggregator_data:/var/lib/postgresql/data \
 			pgvector/pgvector:pg17; \
 	fi
@@ -30,7 +30,13 @@ dashboard: network
 			--name aggregator-dashboard \
 			--network aggregator-net \
 			-p 3030:3000 \
+			-e GF_SECURITY_ADMIN_PASSWORD=$(GRAFANA_ADMIN_PASSWORD) \
+			-e GRAFANA_POSTGRES_HOST=aggregator-pg \
+			-e POSTGRES_DB=$(POSTGRES_DB) \
+			-e POSTGRES_USER=$(POSTGRES_USER) \
+			-e POSTGRES_PASSWORD=$(POSTGRES_PASSWORD) \
 			-v grafana_data:/var/lib/grafana \
+			-v $(PWD)/docker/grafana/provisioning:/etc/grafana/provisioning:ro \
 			grafana/grafana; \
 	fi
 
