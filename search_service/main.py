@@ -15,6 +15,7 @@ from store.messages_store import MessagesStore
 from search_service.brightdata_api_schema.linkedin_jobs_input import LinkedInJobsInput
 from search_service.brightdata_api.brightdata_discover_linkedin_jobs import brightdata_discover_linkedin_jobs
 from search_service.brightdata_api.validate_linkedin_jobs_input import validate_brightdata_linkedin_jobs_input
+from search_service.workplace.filter_by_workplace_type import filter_by_workplace_type
 
 from embedding.embedder import Embedder
 
@@ -26,9 +27,11 @@ from pathlib import Path
 
 class SearchService:
 
-    def __init__(self, brigth_data_token, messages_store: MessagesStore):
+    def __init__(self, brigth_data_token, openai_token, openai_model, messages_store: MessagesStore):
         self.logger = logging.getLogger("search_service")
         self.brigth_data_token = brigth_data_token
+        self.openai_token = openai_token
+        self.openai_model = openai_model
         self.messages_store = messages_store
         self.embedder = Embedder()
 
@@ -105,7 +108,30 @@ class SearchService:
             await self._NOTIFY_REPORT(call_id=call_id, user=user)
             return
 
-        # 5. Calculate embeddings and store documents
+        # 5. Drop postings whose work format is not the requested one
+
+        if request.remote is not None:
+            documents, filter_stats = await filter_by_workplace_type(
+                documents=documents,
+                requested=request.remote,
+                openai_token=self.openai_token,
+                openai_model=self.openai_model,
+            )
+
+            await self._NOTIFY_USER(
+                text=(
+                    f"🧭 <b>{request.remote} check:</b> "
+                    f"{filter_stats.kept} of {filter_stats.total} jobs match"
+                ),
+                user=user,
+            )
+
+            if not documents:
+                await self._NOTIFY_USER(text="🪫 <b>No results</b>", user=user)
+                await self._NOTIFY_REPORT(call_id=call_id, user=user)
+                return
+
+        # 6. Calculate embeddings and store documents
 
         # todo: self.document_to_vector(...)
 
@@ -131,7 +157,7 @@ class SearchService:
                 user_id=user.id,
             )
 
-        # 6. Notify report service
+        # 7. Notify report service
 
         return await self._NOTIFY_REPORT(call_id=call_id, user=user)
 
@@ -235,6 +261,8 @@ async def main() -> None:
 
     search_service = SearchService(
         brigth_data_token=brigth_data_token,
+        openai_token=os.getenv("OPENAI_TOKEN"),
+        openai_model=os.getenv("OPENAI_MODEL"),
         messages_store=messages_store
     )
 

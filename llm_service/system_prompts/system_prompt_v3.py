@@ -110,6 +110,10 @@ must-have skill.
 Do not automatically treat previous job titles as desired
 job titles.
 
+If the user states a work format preference, always set `remote`.
+Results are checked against it and postings with a different work
+format are dropped, so leaving it empty returns unfiltered jobs.
+
 Do not show the search profile as JSON to the user.
 
 ## Telegram Output
