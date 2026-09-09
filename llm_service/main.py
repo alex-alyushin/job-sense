@@ -19,6 +19,8 @@ from utils.log import configure_logging
 
 from .system_prompts.system_prompt_v3 import system_prompt_v3
 
+from .complete import LLMCompletionService
+
 from .tools import TOOLS
 
 ALLOWED_ROLES = [
@@ -333,6 +335,16 @@ class LLMService:
         )
 
 
+async def create_messages_store() -> MessagesStore:
+    return await MessagesStore.create(
+        host=os.getenv("POSTGRES_HOST"),
+        port=os.getenv("POSTGRES_PORT"),
+        dbname=os.getenv("POSTGRES_DB"),
+        user=os.getenv("POSTGRES_USER"),
+        password=os.getenv("POSTGRES_PASSWORD")
+    )
+
+
 async def main() -> None:
 
     from dotenv import load_dotenv
@@ -343,21 +355,25 @@ async def main() -> None:
     openai_token = os.getenv("OPENAI_TOKEN")
     openai_model = os.getenv("OPENAI_MODEL")
 
-    messages_store = await MessagesStore.create(
-        host=os.getenv("POSTGRES_HOST"),
-        port=os.getenv("POSTGRES_PORT"),
-        dbname=os.getenv("POSTGRES_DB"),
-        user=os.getenv("POSTGRES_USER"),
-        password=os.getenv("POSTGRES_PASSWORD")
-    )
+    # Each listener holds the connection it waits for notifications on, so
+    # the two channels need a store each.
 
     llm_service = LLMService(
         openai_token=openai_token,
         openai_model=openai_model,
-        messages_store=messages_store
+        messages_store=await create_messages_store()
     )
 
-    await llm_service.run()
+    completion_service = LLMCompletionService(
+        openai_token=openai_token,
+        openai_model=openai_model,
+        messages_store=await create_messages_store()
+    )
+
+    await asyncio.gather(
+        llm_service.run(),
+        completion_service.run(),
+    )
 
 
 if __name__ == "__main__":
