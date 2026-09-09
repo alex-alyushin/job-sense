@@ -27,6 +27,7 @@ async def brightdata_monitor_progress(
     """
 
     snapshot_status = BrightDataProgress.UNKNOWN
+    notified_status = None
 
     try:
         MONITOR_PROGRESS_URL = f"https://api.brightdata.com/datasets/v3/progress/{snapshot_id}"
@@ -49,7 +50,10 @@ async def brightdata_monitor_progress(
 
                 snapshot_status = result["status"]
 
-                await notify_user(f"📡 Progress status: {snapshot_status}")
+                # Collecting takes minutes, so only changes are worth a message.
+                if snapshot_status != notified_status:
+                    await notify_user(f"📡 Progress status: {snapshot_status}")
+                    notified_status = snapshot_status
 
                 logger.info(
                     "[Monitor progress] snapshot: %s, status: %s",
