@@ -133,7 +133,7 @@ class SearchService:
 
         # 6. Notify report service
 
-        return await self._NOTIFY_REPORT(call_id=call_id, user=user)
+        return await self._NOTIFY_REPORT(call_id=call_id, user=user, request=request)
 
 
     def _parse_document(self, record: str) -> dict:
@@ -178,7 +178,10 @@ class SearchService:
         )
 
 
-    async def _NOTIFY_REPORT(self, call_id: str, user: UserEntity):
+    async def _NOTIFY_REPORT(
+        self, call_id: str, user: UserEntity,
+        request: LinkedInJobsInput | None = None,
+    ):
         await self.messages_store.store(
             role="searcher",
             gateway=user.gateway,
@@ -188,6 +191,11 @@ class SearchService:
             external_chat_id=user.external_chat_id,
             external_user_id=user.external_user_id,
             external_user_name=user.external_user_name,
+            # What was asked for; the report service decides what of it is
+            # worth checking the found postings against.
+            attributes={
+                "search": request.model_dump(exclude_none=True, mode="json")
+            } if request is not None else None,
         )
 
 
