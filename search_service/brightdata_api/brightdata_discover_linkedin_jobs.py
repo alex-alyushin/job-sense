@@ -14,6 +14,10 @@ from search_service.brightdata_api.brightdata_download_snapshot import brightdat
 
 logger = logging.getLogger("brightdata_api")
 
+# Jobs are collected well above the handful the user is shown, because
+# most of them are dropped by the work format check afterwards.
+LIMIT_PER_INPUT = 50
+
 
 dummy_notifications = [
     "⏳ Still waiting for the API...",
@@ -38,6 +42,28 @@ async def send_dummy_progress(notify_user):
 
     except asyncio.CancelledError:
         raise
+
+
+# Bright Data ignores the `remote` filter when collecting jobs, but the
+# keyword is matched against the posting text, so the requested work format
+# is folded into it to bias discovery towards jobs that state it.
+def build_discover_input(request: LinkedInJobsInput) -> dict:
+
+    discover_input = request.model_dump(exclude_none=True)
+
+    workplace_type = request.remote
+
+    if workplace_type is None or request.selective_search:
+        return discover_input
+
+    keyword = discover_input.get("keyword") or ""
+
+    if workplace_type.casefold() in keyword.casefold():
+        return discover_input
+
+    discover_input["keyword"] = f"{workplace_type.casefold()} {keyword}".strip()
+
+    return discover_input
 
 
 async def brightdata_discover_linkedin_jobs(
@@ -69,8 +95,8 @@ async def brightdata_discover_linkedin_jobs(
         discover_url = f"{DISCOVER_URL}?{urlencode(DISCOVER_LINKEDIN_PARAMS)}"
 
         payload = {
-            "input": [request.model_dump(exclude_none=True)],
-            "limit_per_input": 12,
+            "input": [build_discover_input(request)],
+            "limit_per_input": LIMIT_PER_INPUT,
         }
 
         headers = {

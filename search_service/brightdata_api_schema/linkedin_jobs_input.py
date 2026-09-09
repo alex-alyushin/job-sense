@@ -1,7 +1,9 @@
 import json
 
 from enum import StrEnum
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+from workplace.workplace_type import WorkplaceType, normalize_workplace_type
 
 
 class ExperienceLevel(StrEnum):
@@ -73,8 +75,13 @@ class LinkedInJobsInput(BaseModel):
         default=None
     )
 
-    remote: str | None = Field(
-        description="Specify if you want to collect only “Remote”, “On-site” or “Hybrid” jobs",
+    remote: WorkplaceType | None = Field(
+        description=(
+            "Set this whenever the user states a work format preference. "
+            "Bright Data ignores it when collecting jobs, so the postings "
+            "are checked against it afterwards and the ones with a "
+            "different work format are left out of the report."
+        ),
         default=None
     )
 
@@ -102,6 +109,19 @@ class LinkedInJobsInput(BaseModel):
         ),
         default=None
     )
+
+    @field_validator("remote", mode="before")
+    @classmethod
+    def _normalize_remote(cls, value):
+        """
+        Accept casing and spelling variants ("remote", "on site", "ON-SITE")
+        so a sloppy tool call narrows the search instead of failing it.
+        """
+
+        if not isinstance(value, str) or not value.strip():
+            return None
+
+        return normalize_workplace_type(value) or value
 
 
 schema_brightdata_linkedin = LinkedInJobsInput.model_json_schema()
