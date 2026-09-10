@@ -64,6 +64,10 @@ BRIGHT_DATA_TOKEN=<token>
 
 Configure the `POSTGRES_*` variables: host, database name, username, and password.
 
+`DATABASE_URL` is only used by the production Compose stack, where dbmate reads it to reach
+the `postgres` service. Local runs build the same URL from the `POSTGRES_*` variables, so it
+can be left empty in a local `.env`.
+
 Finally, set `GRAFANA_ADMIN_PASSWORD` for the Grafana dashboard.
 
 #### Software Requirements
@@ -72,7 +76,7 @@ You must have the following software installed:
 
 * Python **3.14+**
 * [uv](https://docs.astral.sh/uv/) — package manager
-* Docker — used to run PostgreSQL and Grafana
+* Docker — used to run PostgreSQL, Grafana and database migrations
 
 #### Install Dependencies
 
@@ -80,9 +84,24 @@ You must have the following software installed:
 uv sync
 ```
 
-#### Initialize PostgreSQL Tables
+#### Database Schema
 
-To initialize the PostgreSQL database, run the following command:
+The schema is managed by [dbmate](https://github.com/amacneil/dbmate). Migrations are plain SQL
+files in `db/migrations/` and are applied through a Docker image, so no local dbmate binary is
+needed. Applied versions are tracked in the `schema_migrations` table.
+
+To apply any pending migrations:
+
+```bash
+make migrate
+```
+
+`make up` runs this automatically, so a fresh database is provisioned on first start.
+
+To create a new migration, add a file to `db/migrations/` named `<NNNN>_<name>.sql` with
+`-- migrate:up` and `-- migrate:down` sections, following the existing `0001_init.sql`.
+
+To recreate the database from scratch:
 
 ```bash
 make db
@@ -105,6 +124,34 @@ The logs of each service are color-coded, making it easy to distinguish between 
 ### Deployment
 
 Job Sense is deployed and available on Telegram: [@job_sense_bot](https://t.me/job_sense_bot).
+
+Releases are automated. A push to `main` triggers the
+[Deploy workflow](.github/workflows/deploy.yml), which:
+
+1. builds the application image on GitHub Actions and pushes it to GHCR, tagged both `:prod` and
+   `:sha-<short-sha>`;
+2. connects to the server over SSH, updates the ops files from `main` (`compose.yaml`,
+   `db/migrations/`, `docker/`), pulls the new image, applies pending migrations
+   (`docker compose run --rm migrate`) and recreates the containers.
+
+The server never builds the image and never edits the schema by hand. Application code is not
+executed from disk there — it ships inside the image.
+
+The workflow requires the repository secrets `VDS_HOST`, `VDS_USER`, `VDS_SSH_KEY` and `VDS_PORT`.
+Pushing to GHCR uses the built-in `GITHUB_TOKEN`; the server authenticates to GHCR with its own
+read-only token stored in its local Docker credentials.
+
+#### Rollback
+
+Roll back to a previously built image over SSH:
+
+```bash
+cd /opt/job-sense
+APP_IMAGE_TAG=sha-<short-sha> docker compose up -d
+```
+
+Available tags are listed in the GHCR package. Schema rollback is deliberately not automated —
+follow expand/contract: add a column and ship the code first, drop the old one in a later release.
 
 ### Using Job Sense
 
