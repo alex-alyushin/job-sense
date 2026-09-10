@@ -7,6 +7,7 @@ from itertools import cycle
 from urllib.parse import urlencode
 
 from store.entities.user_entity import UserEntity
+from workplace.workplace_type import WorkplaceType
 
 from search_service.brightdata_api_schema.linkedin_jobs_input import LinkedInJobsInput
 from search_service.brightdata_api.brightdata_monitor_progress import brightdata_monitor_progress, BrightDataProgress
@@ -15,8 +16,11 @@ from search_service.brightdata_api.brightdata_download_snapshot import brightdat
 logger = logging.getLogger("brightdata_api")
 
 # Jobs are collected well above the handful the user is shown, because
-# most of them are dropped by the work format check afterwards.
-LIMIT_PER_INPUT = 50
+# most of them are dropped by the work format check afterwards. Remote
+# work is the scarce slice of what discovery returns, so only a request
+# for it needs the oversized batch.
+LIMIT_PER_INPUT_REMOTE = 100
+LIMIT_PER_INPUT_DEFAULT = 12
 
 
 dummy_notifications = [
@@ -66,6 +70,16 @@ def build_discover_input(request: LinkedInJobsInput) -> dict:
     return discover_input
 
 
+# How many jobs are worth collecting depends on how many survive the work
+# format check, so the batch is sized against the format the request asks for.
+def resolve_limit_per_input(request: LinkedInJobsInput) -> int:
+
+    if request.remote == WorkplaceType.REMOTE:
+        return LIMIT_PER_INPUT_REMOTE
+
+    return LIMIT_PER_INPUT_DEFAULT
+
+
 async def brightdata_discover_linkedin_jobs(
     brigth_data_token: str,
     request: LinkedInJobsInput,
@@ -96,7 +110,7 @@ async def brightdata_discover_linkedin_jobs(
 
         payload = {
             "input": [build_discover_input(request)],
-            "limit_per_input": LIMIT_PER_INPUT,
+            "limit_per_input": resolve_limit_per_input(request),
         }
 
         headers = {
