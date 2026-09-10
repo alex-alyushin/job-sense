@@ -19,7 +19,7 @@ logger = logging.getLogger("brightdata_api")
 # most of them are dropped by the work format check afterwards. Remote
 # work is the scarce slice of what discovery returns, so only a request
 # for it needs the oversized batch.
-LIMIT_PER_INPUT_REMOTE = 100
+LIMIT_PER_INPUT_REMOTE = 50
 LIMIT_PER_INPUT_DEFAULT = 12
 
 
