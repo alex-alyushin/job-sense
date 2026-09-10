@@ -55,7 +55,7 @@ search:
 report:
 	uv run python -m report_service.main
 
-up: postgres dashboard
+up: postgres dashboard migrate
 	@trap 'kill 0' INT TERM EXIT; \
 	uv run python -m gateways.telegram   2>&1 | sed $$'s/^/\033[34m/; s/$$/\033[0m/' & \
 	uv run python -m llm_service.main    2>&1 | sed $$'s/^/\033[35m/; s/$$/\033[0m/' & \
@@ -66,12 +66,14 @@ up: postgres dashboard
 
 # DATABASE
 
-db_drop:
-	uv run python -m database.db_drop
+DBMATE = docker run --rm --network aggregator-net \
+	-v $(PWD)/db/migrations:/db/migrations \
+	-e DATABASE_URL="postgres://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@aggregator-pg:5432/$(POSTGRES_DB)?sslmode=disable" \
+	ghcr.io/amacneil/dbmate:2.27.0 --no-dump-schema
 
-db_init:
-	uv run python -m database.db_init
+migrate: postgres
+	$(DBMATE) --wait up
 
-db: postgres \
-	db_drop \
-	db_init
+db: postgres
+	$(DBMATE) --wait drop
+	$(DBMATE) --wait up
