@@ -24,6 +24,12 @@ from workplace.classify_by_llm import (
 from utils.log import configure_logging
 
 
+# Postings are collected far above what anyone reads, so only the closest
+# matches are reported. A user with no CV has nothing to rank against; the
+# cut still applies, because a hundred postings help no one either way.
+REPORTED_AT_MOST = 15
+
+
 class ReportService:
 
     def __init__(self, messages_store: MessagesStore):
@@ -170,6 +176,9 @@ class ReportService:
         results: list[tuple[DocumentEntity, float]],
     ):
 
+        found = len(results)
+        results = self._best_of(results)
+
         for rank, (document, cv_similarity) in enumerate(results):
             # To User: each document
             await self.messages_store.store(
@@ -190,7 +199,7 @@ class ReportService:
                 },
             )
 
-        report_to_user = self._make_report_to_user(results=results)
+        report_to_user = self._make_report_to_user(results=results, found=found)
         report_to_llm = self._make_report_to_llm(results=results)
 
         if len(results):
@@ -210,6 +219,27 @@ class ReportService:
                 "output": report_to_llm,
                 "call_id": call_id,
             }
+        )
+
+
+    def _best_of(
+        self,
+        results: list[tuple[DocumentEntity, float]],
+    ) -> list[tuple[DocumentEntity, float]]:
+        """
+        Keep the closest matches, worst of them first, so the strongest job
+        is the last one the user reads.
+        """
+
+        by_similarity = sorted(
+            results,
+            key=lambda result: result[1] or 0.0,
+            reverse=True,
+        )
+
+        return sorted(
+            by_similarity[:REPORTED_AT_MOST],
+            key=lambda result: result[1] or 0.0,
         )
 
 
@@ -269,9 +299,19 @@ class ReportService:
         )
 
 
-    def _make_report_to_user(self, results: list[tuple[DocumentEntity, float]]):
+    def _make_report_to_user(
+        self,
+        results: list[tuple[DocumentEntity, float]],
+        found: int | None = None,
+    ):
 
-        lines = [f"📦 <b>Found {len(results)} documents</b>\n"]
+        if found is not None and found > len(results):
+            # Say so, rather than report the cut as the whole of the search.
+            heading = f"📦 <b>Best {len(results)} of {found} documents</b>"
+        else:
+            heading = f"📦 <b>Found {len(results)} documents</b>"
+
+        lines = [heading + "\n"]
 
         for document, cv_similarity in results:
             url     = html.escape(document.document.get("url") or "", quote=True)
