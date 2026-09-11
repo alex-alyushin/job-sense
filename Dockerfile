@@ -1,12 +1,14 @@
 FROM python:3.14-slim
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+COPY --from=ghcr.io/astral-sh/uv:0.9.9 /uv /uvx /bin/
 
 WORKDIR /app
+
+ENV PATH="/app/.venv/bin:$PATH" \
+    UV_NO_SYNC=1
 
 COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-dev
 
 COPY . .
-ENV PATH="/app/.venv/bin:$PATH"
 
-CMD ["sh", "-c", "uv run python -m database.db_init && exec supervisord -c docker/supervisord.conf -n"]
+CMD ["supervisord", "-c", "docker/supervisord.conf", "-n"]
