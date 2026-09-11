@@ -51,7 +51,7 @@ jobs:
           port: ${{ secrets.VDS_PORT }}
           script: |
             set -e
-            cd /opt/job-sense
+            cd /opt/aggregator
             git fetch --depth=1 origin main
             git reset --hard origin/main
             docker compose pull

@@ -138,15 +138,15 @@ The server neither builds the image nor edits the schema by hand, and it does no
 application code on disk — that ships inside the image.
 
 The workflow needs the repository secrets `VDS_HOST`, `VDS_USER`, `VDS_SSH_KEY` and `VDS_PORT`.
-Pushing to GHCR uses the built-in `GITHUB_TOKEN`; the server authenticates to GHCR with a
-read-only token of its own, stored in its local Docker credentials.
+Pushing to GHCR uses the built-in `GITHUB_TOKEN`; the `job-sense` package is public, so the
+server pulls it without authenticating.
 
 #### Rollback
 
 Point the stack at an older image over SSH:
 
 ```bash
-cd /opt/job-sense
+cd /opt/aggregator
 APP_IMAGE_TAG=sha-<short-sha> docker compose up -d
 ```
 
