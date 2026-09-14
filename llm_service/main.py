@@ -95,21 +95,29 @@ class LLMService:
                     if content.type == "output_text":
                         text_content = text_content + content.text
 
-            if text_content:
-                await self.messages_store.store(
-                    role="assistant",
-                    gateway=message.gateway,
-                    direction="user",
-                    text_content=text_content,
-                    external_chat_id=message.external_chat_id,
-                    external_user_id=message.external_user_id,
-                    external_user_name=message.external_user_name,
-                    llm_response=item.model_dump(),
-                    attributes={
-                        "llm_model": self.openai_model,
-                        "llm_usage": response.usage.model_dump(),
-                    } if index == 0 else None
-                )
+            if not text_content:
+                continue
+
+            reply_markup = self._extract_reply_markup(text_content)
+
+            if reply_markup is not None:
+                text_content = reply_markup["content"]
+
+            await self.messages_store.store(
+                role="assistant",
+                gateway=message.gateway,
+                direction="user",
+                text_content=text_content,
+                external_chat_id=message.external_chat_id,
+                external_user_id=message.external_user_id,
+                external_user_name=message.external_user_name,
+                llm_response=item.model_dump(),
+                attributes={
+                    "llm_model": self.openai_model,
+                    "llm_usage": response.usage.model_dump(),
+                } if index == 0 else None,
+                reply_markup=reply_markup["reply_markup"] if reply_markup is not None else None,
+            )
 
         # 5. Tools calling
 
@@ -134,6 +142,30 @@ class LLMService:
 
             else:
                 raise ValueError(f"Unknown function: {item.name}")
+
+
+    def _extract_reply_markup(self, text_content: str) -> dict | None:
+        try:
+            parsed = json.loads(text_content)
+        except (json.JSONDecodeError, TypeError):
+            return None
+
+        if not isinstance(parsed, dict) or parsed.get("type") != "reply_markup":
+            return None
+
+        content = parsed.get("content")
+        reply_markup = parsed.get("reply_markup")
+
+        if not isinstance(content, str):
+            return None
+
+        if not isinstance(reply_markup, list) or not (1 <= len(reply_markup) <= 3):
+            return None
+
+        if not all(isinstance(option, str) for option in reply_markup):
+            return None
+
+        return {"content": content, "reply_markup": reply_markup}
 
 
     def _llm_history(self, *, messages: list[MessageEntity]) -> list[ResponseInputParam]:

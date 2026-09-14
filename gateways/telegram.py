@@ -3,7 +3,13 @@ import asyncio
 import logging
 
 from aiogram import Bot, Dispatcher
-from aiogram.types import Message as TGMessage, BufferedInputFile, LinkPreviewOptions
+from aiogram.types import (
+    Message as TGMessage,
+    BufferedInputFile,
+    LinkPreviewOptions,
+    ReplyKeyboardMarkup,
+    KeyboardButton,
+)
 from aiogram.exceptions import TelegramAPIError
 from aiogram.filters import Command
 
@@ -77,6 +83,8 @@ class TelegramGateway:
     async def send_message(self, cursor: AsyncCursor, message: MessageEntity):
         delivered_message: TGMessage | None = None
 
+        reply_markup = self._build_reply_markup(message)
+
         try:
             delivered_message = await self._send_outgoing_message(
                 chat_id=message.external_chat_id,
@@ -84,6 +92,7 @@ class TelegramGateway:
                 file_content=message.file_content,
                 file_name=message.file_name,
                 parse_mode="HTML",
+                reply_markup=reply_markup,
             )
 
         except TelegramAPIError as e:
@@ -96,6 +105,7 @@ class TelegramGateway:
                         text_content=message.text_content,
                         file_content=message.file_content,
                         file_name=message.file_name,
+                        reply_markup=reply_markup,
                     )
 
                 except TelegramAPIError as e:
@@ -113,13 +123,25 @@ class TelegramGateway:
                 )
 
 
+    def _build_reply_markup(self, message: MessageEntity) -> ReplyKeyboardMarkup | None:
+        if not message.reply_markup:
+            return None
+
+        return ReplyKeyboardMarkup(
+            keyboard=[[KeyboardButton(text=option)] for option in message.reply_markup],
+            resize_keyboard=True,
+            one_time_keyboard=True,
+        )
+
+
     async def _send_outgoing_message(
         self, *,
         chat_id: str,
         text_content=None,
         file_content=None,
         file_name=None,
-        parse_mode=None
+        parse_mode=None,
+        reply_markup=None,
     ):
 
         if file_content is not None:
@@ -148,6 +170,7 @@ class TelegramGateway:
                 parse_mode=parse_mode,
                 link_preview_options=LinkPreviewOptions(is_disabled=True),
                 text=text,
+                reply_markup=reply_markup,
             )
 
         return None

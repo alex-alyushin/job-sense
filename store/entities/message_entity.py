@@ -9,6 +9,7 @@ class MessageEntity:
     direction: str
 
     text_content: str | None
+    reply_markup: list[str] | None
     file_content: str | None
     file_name: str | None
 
@@ -32,15 +33,16 @@ def row_to_message(row):
         gateway=row[2],
         direction=row[3],
         text_content=row[4],
-        file_content=row[5],
-        file_name=row[6],
-        external_chat_id=row[7],
-        external_user_id=row[8],
-        external_user_name=row[9],
-        external_message_id=row[10],
-        llm_response=row[11],
-        attributes=row[12],
-        created_at=row[13],
-        processed_at=row[14],
-        resolved_at=row[15]
+        reply_markup=row[5],
+        file_content=row[6],
+        file_name=row[7],
+        external_chat_id=row[8],
+        external_user_id=row[9],
+        external_user_name=row[10],
+        external_message_id=row[11],
+        llm_response=row[12],
+        attributes=row[13],
+        created_at=row[14],
+        processed_at=row[15],
+        resolved_at=row[16]
     )
