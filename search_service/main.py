@@ -71,7 +71,7 @@ class SearchService:
         # 3. BrightData API call
 
         await self._NOTIFY_USER(
-            text=f"🔎 <b>Searching...</b>\n\n{self._format_search_params(request)}<button>хуй</button>",
+            text=f"🔎 <b>Searching...</b>\n\n{self._format_search_params(request)}",
             user=user,
         )
 
