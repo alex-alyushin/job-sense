@@ -73,7 +73,7 @@ class MessagesStore:
 
     async def store(
         self, role, gateway, direction,
-        text_content=None, file_content=None, file_name=None,
+        text_content=None, reply_markup=None, file_content=None, file_name=None,
         external_chat_id=None, external_user_id=None,
         external_user_name=None, external_message_id=None,
         llm_response=None, attributes=None,
@@ -92,6 +92,7 @@ class MessagesStore:
                     gateway,
                     direction,
                     text_content,
+                    reply_markup,
                     file_content,
                     file_name,
                     external_chat_id,
@@ -100,12 +101,13 @@ class MessagesStore:
                     external_message_id,
                     llm_response,
                     attributes
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """, (
                 role,
                 gateway,
                 direction,
                 text_content,
+                reply_markup,
                 file_content,
                 file_name,
                 external_chat_id,
@@ -161,6 +163,7 @@ class MessagesStore:
                             gateway,
                             direction,
                             text_content,
+                            reply_markup,
                             file_content,
                             file_name,
                             external_chat_id,
@@ -216,6 +219,7 @@ class MessagesStore:
                 gateway,
                 direction,
                 text_content,
+                reply_markup,
                 file_content,
                 file_name,
                 external_chat_id,

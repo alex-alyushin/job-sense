@@ -1,3 +1,4 @@
+import json
 import httpx
 import asyncio
 import logging
@@ -78,6 +79,15 @@ async def brightdata_discover_linkedin_jobs(
             "Content-Type": "application/json",
         }
 
+        # What the search actually asks Bright Data for. Logged before the
+        # call, so a rejected request can be read back exactly as it was sent.
+        logger.info(
+            "POST %s params=%s payload=%s",
+            DISCOVER_URL,
+            json.dumps(DISCOVER_LINKEDIN_PARAMS, ensure_ascii=False),
+            json.dumps(payload, ensure_ascii=False),
+        )
+
         async with httpx.AsyncClient() as async_client:
             response = await async_client.post(
                 discover_url,
@@ -114,6 +124,16 @@ async def brightdata_discover_linkedin_jobs(
 
     except httpx.ConnectError as connection_error:
         logger.error(connection_error)
+
+    # Bright Data explains a rejection in the response body, which the
+    # exception text leaves out, so this case is caught before the general one.
+    except httpx.HTTPStatusError as status_error:
+        logger.error(
+            "%s %s rejected the request: %s",
+            status_error.response.status_code,
+            status_error.response.reason_phrase,
+            status_error.response.text.strip()[:1000] or "(empty body)",
+        )
 
     except httpx.HTTPError as http_error:
         logger.error(http_error)
