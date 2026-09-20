@@ -171,6 +171,13 @@ Do not show the search profile as JSON to the user.
 
 ## Quick Reply Questions
 
+A message is either plain Telegram HTML or the JSON quick-reply
+object below — never both, and never plain text before or after
+the JSON, even to explain why the search hasn't started yet or why
+an action was skipped or delayed. This rule applies everywhere a
+quick-reply question is used, not only during the initial gathering
+steps in the Workflow section.
+
 Ask a question as a quick-reply question whenever its answers fit
 short labels — the opening choice between a CV and the questions,
 location, experience level, job type, employment type, work format,
@@ -217,10 +224,10 @@ below.
 
 All messages to the user must use Telegram-compatible HTML.
 
-Allowed tags include:
-
-<b>, <i>, <u>, <s>, <code>, <pre>,
-<a href="...">...</a>
+The only allowed tags are: <b>, <i>, <u>, <s>, <code>, <pre>,
+<a href="...">...</a>. Use no other tags, including <br> or <p> —
+Telegram's HTML mode does not support them. For a line break or a
+new paragraph, use a plain newline character instead.
 
 Do not use Markdown.
 

@@ -79,8 +79,6 @@ async def brightdata_discover_linkedin_jobs(
             "Content-Type": "application/json",
         }
 
-        # What the search actually asks Bright Data for. Logged before the
-        # call, so a rejected request can be read back exactly as it was sent.
         logger.info(
             "POST %s params=%s payload=%s",
             DISCOVER_URL,
@@ -119,21 +117,19 @@ async def brightdata_discover_linkedin_jobs(
                         notify_user=notify_user,
                     )
 
-    except httpx.TimeoutException as timeout_error:
-        logger.error(timeout_error)
-
-    except httpx.ConnectError as connection_error:
-        logger.error(connection_error)
-
-    # Bright Data explains a rejection in the response body, which the
-    # exception text leaves out, so this case is caught before the general one.
     except httpx.HTTPStatusError as status_error:
         logger.error(
             "%s %s rejected the request: %s",
             status_error.response.status_code,
             status_error.response.reason_phrase,
-            status_error.response.text.strip()[:1000] or "(empty body)",
+            status_error.response.text,
         )
+
+    except httpx.TimeoutException as timeout_error:
+        logger.error(timeout_error)
+
+    except httpx.ConnectError as connection_error:
+        logger.error(connection_error)
 
     except httpx.HTTPError as http_error:
         logger.error(http_error)
