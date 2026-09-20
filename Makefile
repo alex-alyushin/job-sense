@@ -60,8 +60,6 @@ up: postgres dashboard migrate
 
 # DATABASE
 
-# dbmate runs from its image, so no local binary is needed. The standalone
-# postgres from `make postgres` answers to aggregator-pg on aggregator-net.
 DBMATE = docker run --rm --network aggregator-net \
 	-v $(PWD)/db/migrations:/db/migrations \
 	-e DATABASE_URL="postgres://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@aggregator-pg:5432/$(POSTGRES_DB)?sslmode=disable" \

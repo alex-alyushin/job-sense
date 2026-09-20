@@ -3,9 +3,15 @@ import asyncio
 import logging
 
 from aiogram import Bot, Dispatcher
-from aiogram.types import Message as TGMessage, BufferedInputFile, LinkPreviewOptions
 from aiogram.exceptions import TelegramAPIError
 from aiogram.filters import Command
+from aiogram.types import (
+    Message as TGMessage,
+    BufferedInputFile,
+    LinkPreviewOptions,
+    ReplyKeyboardMarkup,
+    KeyboardButton,
+)
 
 from psycopg import AsyncCursor
 
@@ -81,6 +87,7 @@ class TelegramGateway:
             delivered_message = await self._send_outgoing_message(
                 chat_id=message.external_chat_id,
                 text_content=message.text_content,
+                reply_markup=message.reply_markup,
                 file_content=message.file_content,
                 file_name=message.file_name,
                 parse_mode="HTML",
@@ -94,6 +101,7 @@ class TelegramGateway:
                     delivered_message = await self._send_outgoing_message(
                         chat_id=message.external_chat_id,
                         text_content=message.text_content,
+                        reply_markup=message.reply_markup,
                         file_content=message.file_content,
                         file_name=message.file_name,
                     )
@@ -117,9 +125,10 @@ class TelegramGateway:
         self, *,
         chat_id: str,
         text_content=None,
+        reply_markup=None,
         file_content=None,
         file_name=None,
-        parse_mode=None
+        parse_mode=None,
     ):
 
         if file_content is not None:
@@ -143,11 +152,23 @@ class TelegramGateway:
             # @todo: send long message by chunks
             text = truncate(text_content, max_length=4096)
 
+            reply_keyboard_markup = ReplyKeyboardMarkup(
+                resize_keyboard=True,
+                one_time_keyboard=True,
+                keyboard=[
+                    [KeyboardButton(text=text)]
+                    for text in reply_markup
+                ],
+            ) if (reply_markup is not None) else None
+
+            link_preview_options = LinkPreviewOptions(is_disabled=True)
+
             return await self.bot.send_message(
                 chat_id=chat_id,
-                parse_mode=parse_mode,
-                link_preview_options=LinkPreviewOptions(is_disabled=True),
                 text=text,
+                parse_mode=parse_mode,
+                reply_markup=reply_keyboard_markup,
+                link_preview_options=link_preview_options,
             )
 
         return None
@@ -157,6 +178,7 @@ class TelegramGateway:
         await self.messages_store.resolve_session(
             external_chat_id=str(message.chat.id)
         )
+
 
     async def _extract_file(self, message: TGMessage):
         document = message.document

@@ -88,28 +88,30 @@ class LLMService:
 
         for index, item in enumerate(response.output):
 
-            text_content = ""
-
             if item.type == "message":
                 for content in item.content:
                     if content.type == "output_text":
-                        text_content = text_content + content.text
 
-            if text_content:
-                await self.messages_store.store(
-                    role="assistant",
-                    gateway=message.gateway,
-                    direction="user",
-                    text_content=text_content,
-                    external_chat_id=message.external_chat_id,
-                    external_user_id=message.external_user_id,
-                    external_user_name=message.external_user_name,
-                    llm_response=item.model_dump(),
-                    attributes={
-                        "llm_model": self.openai_model,
-                        "llm_usage": response.usage.model_dump(),
-                    } if index == 0 else None
-                )
+                        if not content.text:
+                            continue
+
+                        text_content, reply_markup = self._parse_llm_response(content.text)
+
+                        await self.messages_store.store(
+                            role="assistant",
+                            gateway=message.gateway,
+                            direction="user",
+                            text_content=text_content,
+                            reply_markup=reply_markup,
+                            external_chat_id=message.external_chat_id,
+                            external_user_id=message.external_user_id,
+                            external_user_name=message.external_user_name,
+                            llm_response=item.model_dump(),
+                            attributes={
+                                "llm_model": self.openai_model,
+                                "llm_usage": response.usage.model_dump(),
+                            } if index == 0 else None,
+                        )
 
         # 5. Tools calling
 
@@ -134,6 +136,18 @@ class LLMService:
 
             else:
                 raise ValueError(f"Unknown function: {item.name}")
+
+
+    def _parse_llm_response(self, text_content: str):
+        try:
+            parsed = json.loads(text_content)
+        except (json.JSONDecodeError, TypeError):
+            return text_content, None
+
+        if parsed.get("type") == "reply_markup":
+            return parsed.get("content"), parsed.get("reply_markup")
+
+        return text_content, None
 
 
     def _llm_history(self, *, messages: list[MessageEntity]) -> list[ResponseInputParam]:
